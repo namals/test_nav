@@ -1,0 +1,25 @@
+<package>
+  <description brief="test_nav">
+
+     test_nav
+
+  </description>
+  <author>seahawk</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/test_nav</url>
+  <depend package="roscpp"/>
+  <depend package="std_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="nav_msgs"/>
+  <depend package="ogmapper"/>
+  <depend package="GPS"/>
+  <depend package="compass"/>
+  
+  <export>
+	<cpp cflags="-I${prefix}/msg_gen/cpp/include"/>
+  </export>
+
+</package>
+
+

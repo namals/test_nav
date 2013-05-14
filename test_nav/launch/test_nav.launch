@@ -1,0 +1,10 @@
+<launch>
+		<node pkg="test_nav" type="test_nav" name="test_nav" output="log">
+			  <param name="initial_bearing" value="2.38411976"/>
+			  <param name="waypoint_fname" value="/home/ehsan/fuerte_workspace/sandbox/test_nav/launch/waypoints6.txt"/>
+			  <param name="neighborhood_radius" value="4"/>
+			  <param name="target_epsilon" value="1.5"/>
+			  <param name="neighborhood_timeout_threshold" value="120"/>
+			  <param name="gps_topic" value="/drrobot_gps_info"/>
+		</node>
+</launch>
