@@ -1,7 +1,11 @@
 <launch>
+	
+	<include file="$(find techxrobot)/launch/test_obs_avoid.launch"/>
+        <include file="$(find directed_exploration)/launch/de_planner.launch"/>
+  
 		<node pkg="test_nav" type="test_nav" name="test_nav" output="log">
 			  <param name="initial_bearing" value="2.38411976"/>
-			  <param name="waypoint_fname" value="/home/techx/ros_workspace/test_nav/launch/waypoints4.txt"/>			  
+			  <param name="waypoint_fname" value="/home/techx/ros_workspace/test_nav/launch/waypoints_test.txt"/>			  
 			  <param name="gps_topic" value="/drrobot_gps_info"/>
 			  <param name="initial_latitude" value="1.342717"/>
 			  <param name="initial_longitude" value="103.680319"/>
@@ -10,9 +14,9 @@
 			  <param name="compass_topic" value="/drrobot_compass_info"/>
 			  <param name="use_ogmapper" value="false"/>
 			  <param name="inter_beacon_dist" value="6.0"/>
-			  <param name="min_dist_from_beacon_to_wp" value="2.0"/>
-			  <param name="neighborhood_timeout_threshold" value="120"/>
+			  <param name="min_dist_from_beacon_to_wp" value="6.0"/>
+			  <param name="neighborhood_timeout_threshold" value="20"/>
 			  <param name="neighborhood_radius" value="5.0"/>
-			  <param name="target_epsilon" value="1.5"/>			  
+			  <param name="target_epsilon" value="1.0"/>			  
 		</node>
 </launch>

@@ -44,12 +44,19 @@
 #include <std_msgs/Empty.h>
 #include <GPS/gps.h>
 #include <compass/compass.h>
-#include <test_nav/NextWayPoint.h>
+#include <techx_msgs/NextWayPoint.h>
 #include <tf/transform_listener.h>
+#include <techx_msgs/LocalNavStatus.h>
 
 #include <boost/thread.hpp>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/rolling_mean.hpp>
 
 #define PI 3.14159265359
+
+using namespace boost::accumulators;
+typedef accumulator_set<double, stats<tag::rolling_mean> > double_mean_rolling_window_accumulator;
 
 struct GPSPoint
 {
@@ -93,19 +100,26 @@ public:
 private:
 	ros::NodeHandle* n;
 	ros::Subscriber gps_sub;
+	ros::Subscriber compass_sub;
 	ros::Subscriber denode_sub;	            /**< wait for empty signal */
+	ros::Subscriber denode_status_sub;			/**< subscribe to de_node's status */
 	ros::Publisher wp_pub;					/**< waypoint publisher */
 	ros::Publisher reached_goal_signal_pub; /**< publisher to signal goal reached */
 	ros::Publisher odom_reset_pub;          /**< publisher to signal a resetting of TF tree */
+	ros::Publisher task_signal_pub;			/**< publisher to signal end of task */
 	tf::TransformListener* listener;        /**< listener used to get position */
 	std::string gps_topic;					/**< stores the gps topic name */
+	std::string compass_topic;
 
 	bool use_ogmapper;             /**< Flag to indicate whether to use ogmapper or not */
 	CoordinateFrame local_frame;   /**< Stores offset and bearing information of the local coordinate frame in use */
 	volatile bool has_gps;		   /**< Flag to indicate whether we have GPS or not */
+	volatile bool has_compass;	   /**< Flag to indicate whether we have compass or not */
 	volatile bool de_reached_wp;   /**< Flag to indicate whether to the underlying lower level controller drove the robot to the waypoint  */
 	volatile bool moved_to_beacon; /**< Flag to indicate that the robot moved to a virtual beacon along the path towards next way point */
 	volatile double compass_yaw;   /**< Stoes the the most recent yaw information from compass */
+	GPSPoint initial_gps;	       /**< stores the GPS coordinate of the initial position of the robot */
+	double gps_timeout_th;
 	GPSPoint pos_gps;              /**< stores the most recent GPS value received */
 	Point2D pos_utm;               /**< position of the robot in the current coordinate frame according to GPS  */
 	Point2D pos_map;			   /**< position of the robot in the current coordinate frame according to SLAM  */
@@ -115,7 +129,6 @@ private:
 	double beta_map;               // current bearing in current /map coordinate frame
 	Point2D wp_map;				   /**< current way point in map coordinates */
 	std::queue<GPSPoint>* waypoints; /**< Stores the current sequence of waypoints for the robot to visit */
-	double initial_bearing;			 /**< initial robot orientation w.r.t. north */
 	std::string wp_fname;			 /**< full qualified name of the file storing the waypoints  */
 	
 	double neighborhood_radius;	       /**< Radius of the circle that includes the neighborhood surrouding a waypoint */
@@ -126,9 +139,17 @@ private:
 	bool is_in_nbhd;				   /**< Flag to indicate if the robot is in the neighborhood of current waypoint */
 	ros::Time neighborhood_time;	   /**< Timer used during the movements inside the neighborhood of waypoint */
 	ros::Time gps_ts;				   /**< Timestamp of the most recent GPS measurement */
+	techx_msgs::LocalNavStatus denode_status;
+	int gps_avg_N;
+
+	double_mean_rolling_window_accumulator* gps_lon_acc;
+	double_mean_rolling_window_accumulator* gps_lat_acc;
+	unsigned int gps_fixes;
 
 	boost::mutex gps_mutex; 
 	boost::mutex beta_mutex;
+	boost::mutex decision_mutex;
+	boost::mutex navstatus_mutex;
 	
 	boost::shared_ptr<boost::thread> controller_thread;
 	boost::shared_ptr<boost::thread> pos_check_thread;
@@ -142,6 +163,11 @@ private:
 	 * @brief Waits until the initial GPS measurement is received
 	 */	
 	void WaitForInitialGPSFix();
+
+	/**
+	 * @brief Waits until the initial compass measurement is received
+	 */
+	void WaitForInitialCompassData();
 
 	/**
 	 * @brief Function used by the main thread of the controller
@@ -181,6 +207,8 @@ private:
 	void GPS_cb(const GPS::gps::ConstPtr& gps_msg);
 	void DENode_cb(const std_msgs::Empty::ConstPtr& msg);
 	void Compass_cb(const compass::compass::ConstPtr& compass_msg);
+	void DENodeStatus_cb(const techx_msgs::LocalNavStatus::ConstPtr& navstatus);
+	techx_msgs::LocalNavStatus getDENodeStatus();
 
 	inline double Euclidean_Dist(Point2D& p1, Point2D& p2)	
 	{
@@ -201,7 +229,7 @@ private:
 
 	inline void SendNextWayPoint(double r, double theta)
 	{
-		test_nav::NextWayPoint wp;
+		techx_msgs::NextWayPoint wp;
 		wp.range = r;
 		wp.bearing = theta;   
 		ROS_INFO("Sending next way point with range, bearing : %f, %f", wp.range, wp.bearing*180/PI);
@@ -212,8 +240,9 @@ private:
 	{
 		bool result;
 		gps_mutex.lock();
-		ros::Duration d = ros::Time::now() - gps_ts;
-		result = (d.toSec() <= 3.0)? true : false;
+		/* ros::Duration d = ros::Time::now() - gps_ts; */
+		/* result = (d.toSec() <= 3.0)? true : false; */
+		result = has_gps;
 		gps_point = pos_gps;
 		gps_mutex.unlock();
 		return result;
